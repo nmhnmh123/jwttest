@@ -1,0 +1,13 @@
+[Bb]in/
+[Oo]bj/
+*.user
+*.userosscache
+*.sln.docuser
+.idea/
+.vs/
+.vscode/
+*.db
+*.db-shm
+*.db-wal
+appsettings.Development.json
+.DS_Store
