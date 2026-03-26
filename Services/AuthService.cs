@@ -104,37 +104,25 @@ public class AuthService
     /// 4. Đánh dấu Refresh Token cũ là ĐÃ DÙNG (không dùng lại được)
     /// 5. Tạo cặp token mới
     /// </summary>
-    public async Task<TokenResponseDto?> RefreshTokenAsync(string accessToken, string refreshToken)
+    public async Task<TokenResponseDto?> RefreshTokenAsync(string refreshToken)
     {
-        // 1. Đọc thông tin từ Access Token (bỏ qua kiểm tra hết hạn)
-        var principal = _jwtService.GetPrincipalFromExpiredToken(accessToken);
-        if (principal == null) return null;
+        // 1. Tìm Refresh Token trong database và nạp luôn thông tin User liên quan
+        var storedToken = await _db.RefreshTokens
+            .Include(rt => rt.User)
+            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
 
-        // 2. Lấy userId từ Claims
-        var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out int userId)) return null;
-
-        // 3. Tìm user và refresh token trong database
-        var user = await _db.Users
-            .Include(u => u.RefreshTokens)
-            .FirstOrDefaultAsync(u => u.Id == userId);
-
-        if (user == null) return null;
-
-        // 4. Tìm đúng refresh token trong danh sách của user này
-        var storedToken = user.RefreshTokens
-            .FirstOrDefault(rt => rt.Token == refreshToken);
-
-        // 5. Kiểm tra tính hợp lệ
+        // 2. Kiểm tra tính hợp lệ
+        // - Token tồn tại
+        // - Token còn hạn, chưa bị dùng, chưa bị thu hồi (logic IsActive trong entity)
         if (storedToken == null || !storedToken.IsActive)
-            return null; // Token không tồn tại, đã dùng, bị thu hồi, hoặc hết hạn
+            return null;
 
-        // 6. Đánh dấu token cũ là ĐÃ DÙNG (Rotation pattern - bảo mật hơn)
+        // 3. Đánh dấu token cũ là ĐÃ DÙNG (Rotation pattern - bảo mật hơn)
         storedToken.IsUsed = true;
         _db.RefreshTokens.Update(storedToken);
 
-        // 7. Tạo cặp token mới
-        return await CreateTokensAsync(user);
+        // 4. Tạo cặp token mới cho User của refresh token này
+        return await CreateTokensAsync(storedToken.User);
     }
 
     // =====================================================

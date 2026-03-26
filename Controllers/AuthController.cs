@@ -70,18 +70,19 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh()
     {
-        // Đọc token từ Cookie thay vì Header / Body
-        var accessToken = Request.Cookies["AccessToken"];
+        // 1. Chỉ cần đọc RefreshToken từ Cookie để làm mới
         var refreshToken = Request.Cookies["RefreshToken"];
 
-        if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(refreshToken))
-            return Unauthorized(new { message = "Thiếu thông tin xác thực." });
+        if (string.IsNullOrEmpty(refreshToken))
+            return Unauthorized(new { message = "Thiếu Refresh Token." });
 
-        var result = await _authService.RefreshTokenAsync(accessToken, refreshToken);
+        // 2. AuthService sẽ kiểm tra logic trong DB và trả về cặp token mới
+        var result = await _authService.RefreshTokenAsync(refreshToken);
 
         if (result == null)
             return Unauthorized(new { message = "Refresh token không hợp lệ hoặc đã hết hạn." });
 
+        // 3. Ghi đè bộ Token mới vào Cookie
         SetTokenCookies(result.AccessToken, result.RefreshToken, result.AccessTokenExpiry);
 
         return Ok(new { message = "Làm mới token thành công" });
